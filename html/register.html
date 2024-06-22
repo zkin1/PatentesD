@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="../css/style.css">
+    <link rel="stylesheet" href="../css/nav.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/3.7.0/animate.min.css">
+    <link href="https://fonts.googleapis.com/css?family=Quicksand" rel="stylesheet">
+    <link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.8.1/css/all.css" integrity="sha384-50oBUHEmvpQ+1lW4y57PTFmhCaXp0ML5d60M1M7uH2+nqUivzIebhndOJK28anvf" crossorigin="anonymous">
+    <title>Document</title>
+</head>
+<body>
+
+  <nav class="navbar">
+    <div class="container">
+      <a class="navbar-brand" href="#">Patentes Duoc <scan>UC</scan></a>
+      <button class="navbar-toggler" id="navbar-toggler">
+        <span class="navbar-toggler-icon"></span>
+        <span class="navbar-toggler-icon"></span>
+        <span class="navbar-toggler-icon"></span>
+      </button>
+      <ul class="navbar-nav" id="navbar-nav">
+        <li class="nav-item">
+          <a class="nav-link" href="index.html" id="inicio-link">Inicio</a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link" href="agregarPatente.html" id="comics-link">Agregar patente</a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link" href="eliminarPatente.html" id="comics-link">Eliminar patente</a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link" href="login.html" id="login-link"><i class='bx bx-user'></i> Iniciar sesión</a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link" href="register.html" id="registro-link"><i class='bx bx-user-plus'></i> Registro</a>
+        </li>
+        <li class="nav-item" id="user-info" style="display: none;">
+          <span class="nav-link">Bienvenido, <span id="username-display"></span></span>
+        </li>
+        <li class="nav-item" id="logout-link" style="display: none;">
+          <a class="nav-link" href="index.html" onclick="logout()"><i class='bx bx-log-out'></i> Cerrar sesión</a>
+        </li>
+      </ul>
+    </div>
+  </nav>
+
+
+    <main>
+        <div class="box">
+          <div class="inner-box">
+            <div class="forms-wrap">
+              <form action="index.html" autocomplete="off" class="sign-in-form">
+                <div class="logo">
+                  <img src="./img/logo.png" alt="" />
+                  <h4>Duoc <scan>UC</scan></h4>
+                </div>
+  
+                <div class="heading">
+                  <h2>!Bienvenido¡</h2>
+                  <h6>ya estas registrado?</h6>
+                  <a href="../html/login.html" class="toggle">inicia sesion</a>
+                </div>
+                <div class="actual-form">
+                  <div class="input-wrap">
+                    <input
+                      type="text"
+                      minlength="4"
+                      class="input-field"
+                      autocomplete="off"
+                      required
+                      placeholder="Nombre"
+                    />
+                  </div>
+
+                  <div class="input-wrap">
+                    <input
+                      type="text"
+                      minlength="4"
+                      class="input-field"
+                      autocomplete="off"
+                      required
+                      placeholder="Correo institucional"
+                    />
+                  </div>
+
+                  <div class="input-wrap">
+                    <input
+                      type="password"
+                      minlength="4"
+                      class="input-field"
+                      autocomplete="off"
+                      required
+                      placeholder="Contraseña"
+                    />
+                  </div>
+
+                  <div class="input-wrap">
+                    <input
+                      type="text"
+                      minlength="4"
+                      class="input-field"
+                      autocomplete="off"
+                      required
+                      placeholder="Numero Patente"
+                    />
+                  </div>
+  
+                  <input type="submit" value="Registrarse" class="sign-btn" />
+  
+                </div>
+              </form>
+      </main>
+
+      <script src="../js/script.js"></script>
+</body>
+</html>
