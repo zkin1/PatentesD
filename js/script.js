@@ -36,7 +36,7 @@ document.addEventListener('DOMContentLoaded', function () {
       const nombreInput = registerForm.querySelector('input[placeholder="Nombre"]');
       const emailInput = registerForm.querySelector('input[placeholder="Correo institucional"]');
       const passwordInput = registerForm.querySelector('input[placeholder="Contraseña"]');
-      const patenteInput = registerForm.querySelector('input[placeholder="Numero Patente"]');
+      const patenteInput = registerForm.querySelector('input[placeholder="Numero Patente (ABC123)"]');
       const telefonoInput = registerForm.querySelector('input[placeholder="Número telefónico"]');
 
       const usuario = {
