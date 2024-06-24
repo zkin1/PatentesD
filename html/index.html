@@ -48,13 +48,14 @@
           <form action="" autocomplete="off" class="search-form">
             <div class="input-wrap">
               <input
-                type="text"
-                id="patente-input"
-                class="input-field"
-                autocomplete="off"
-                required
-                placeholder="Ingrese la patente"
-              />
+              type="text"
+              id="patente-input"
+              class="input-field"
+              autocomplete="off"
+              required
+              placeholder="Ingrese la patente"
+              oninput="this.value = this.value.toUpperCase()"
+            />
             </div>
             <input type="submit" value="Buscar" class="search-btn" />
           </form>
