@@ -8,17 +8,27 @@ document.addEventListener('DOMContentLoaded', function () {
     });
   }
 
-  // Llamar a updateNavBar al cargar la página
   updateNavBar();
 
-  // Manejo de formulario de inicio de sesión
+  const usuarioLogueado = JSON.parse(localStorage.getItem('usuarioLogueado'));
+  const searchContainer = document.getElementById('search-container');
+  const notLoggedInMessage = document.getElementById('not-logged-in-message');
+
+  if (usuarioLogueado) {
+    if (searchContainer) searchContainer.style.display = 'block';
+    if (notLoggedInMessage) notLoggedInMessage.style.display = 'none';
+  } else {
+    if (searchContainer) searchContainer.style.display = 'none';
+    if (notLoggedInMessage) notLoggedInMessage.style.display = 'block';
+  }
+
   const loginForm = document.querySelector('.sign-in-form');
   if (loginForm) {
     loginForm.addEventListener('submit', function (e) {
       e.preventDefault();
 
-      const emailInput = loginForm.querySelector('input[type="text"]');
-      const passwordInput = loginForm.querySelector('input[type="password"]');
+      const emailInput = document.getElementById('login-email');
+      const passwordInput = document.getElementById('login-password');
 
       const correoInstitucional = emailInput.value;
       const contraseña = passwordInput.value;
@@ -27,17 +37,16 @@ document.addEventListener('DOMContentLoaded', function () {
     });
   }
 
-  // Manejo de formulario de registro
   const registerForm = document.querySelector('.register-in-form');
   if (registerForm) {
     registerForm.addEventListener('submit', function (e) {
       e.preventDefault();
 
-      const nombreInput = registerForm.querySelector('input[placeholder="Nombre"]');
-      const emailInput = registerForm.querySelector('input[placeholder="Correo institucional"]');
-      const passwordInput = registerForm.querySelector('input[placeholder="Contraseña"]');
-      const patenteInput = registerForm.querySelector('input[placeholder="Numero Patente (ABC123)"]');
-      const telefonoInput = registerForm.querySelector('input[placeholder="Número telefónico"]');
+      const nombreInput = document.getElementById('register-nombre');
+      const emailInput = document.getElementById('register-email');
+      const passwordInput = document.getElementById('register-password');
+      const patenteInput = document.getElementById('register-patente');
+      const telefonoInput = document.getElementById('register-telefono');
 
       const usuario = {
         nombre: nombreInput.value,
@@ -51,11 +60,16 @@ document.addEventListener('DOMContentLoaded', function () {
     });
   }
 
-  // Manejo del formulario de búsqueda de patentes
   const searchForm = document.querySelector('.search-form');
   if (searchForm) {
     searchForm.addEventListener('submit', function (e) {
       e.preventDefault();
+
+      const usuarioLogueado = JSON.parse(localStorage.getItem('usuarioLogueado'));
+      if (!usuarioLogueado) {
+        alert('Debe iniciar sesión para buscar por patente.');
+        return;
+      }
 
       const patenteInput = document.getElementById('patente-input');
       const numeroPatente = patenteInput.value.trim();
@@ -67,7 +81,6 @@ document.addEventListener('DOMContentLoaded', function () {
   }
 });
 
-// Función para actualizar la barra de navegación
 function updateNavBar() {
   const userInfo = document.getElementById('user-info');
   const usernameDisplay = document.getElementById('username-display');
@@ -91,14 +104,12 @@ function updateNavBar() {
   }
 }
 
-// Función para cerrar sesión
 window.logout = function () {
   localStorage.removeItem('usuarioLogueado');
   updateNavBar();
   window.location.href = 'index.html';
 }
 
-// Función asincrónica para manejar el inicio de sesión
 async function iniciarSesion(correoInstitucional, contraseña) {
   try {
     const response = await fetch('http://localhost:3000/usuarios');
@@ -126,7 +137,6 @@ async function iniciarSesion(correoInstitucional, contraseña) {
   }
 }
 
-// Función asincrónica para manejar el registro de usuarios
 async function registrarUsuario(usuario) {
   try {
     const response = await fetch('http://localhost:3000/usuarios', {
@@ -143,25 +153,28 @@ async function registrarUsuario(usuario) {
 
     const data = await response.json();
     alert('Registro exitoso');
-    window.location.href = 'login.html'; // Redirige al usuario a la página de inicio de sesión después del registro
+    window.location.href = 'login.html';
   } catch (error) {
     console.error('Error:', error);
     alert('Error en el registro: ' + error.message);
   }
 }
 
-// Función asincrónica para buscar un usuario por su número de patente
 async function buscarPorPatente(numeroPatente) {
   try {
-    const response = await fetch('http://localhost:3000/usuarios');
+    const usuarioLogueado = JSON.parse(localStorage.getItem('usuarioLogueado'));
+    if (!usuarioLogueado) {
+      alert('Debe iniciar sesión para buscar por patente.');
+      return;
+    }
+
+    // Buscar el usuario por número de patente
+    const response = await fetch(`http://localhost:3000/buscarPorPatente/${numeroPatente}`);
     if (!response.ok) {
       throw new Error('Error en la respuesta de la red');
     }
 
-    const usuarios = await response.json();
-    const usuarioEncontrado = usuarios.find(usuario =>
-      usuario.numeroPatente === numeroPatente
-    );
+    const usuarioEncontrado = await response.json();
 
     const resultadosDiv = document.getElementById('search-results');
     resultadosDiv.innerHTML = ''; // Limpiar los resultados anteriores
@@ -173,6 +186,9 @@ async function buscarPorPatente(numeroPatente) {
         <p>Número de Teléfono: ${usuarioEncontrado.numeroTelefono}</p>
         <p>Patente: ${usuarioEncontrado.numeroPatente}</p>
       `;
+
+      // Registrar la consulta después de la búsqueda
+      await registrarConsulta(usuarioLogueado.correoInstitucional, numeroPatente);
     } else {
       resultadosDiv.style.display = 'block';
       resultadosDiv.innerHTML = '<p>No se encontró ningún usuario con esa patente.</p>';
@@ -180,5 +196,68 @@ async function buscarPorPatente(numeroPatente) {
   } catch (error) {
     console.error('Error:', error);
     alert('Error en la búsqueda: ' + error.message);
+  }
+}
+
+async function registrarConsulta(correoUsuario, numeroPatente) {
+  try {
+    const response = await fetch('http://localhost:3000/consultasRegistradas', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ correoUsuario, numeroPatente })
+    });
+
+    if (!response.ok) {
+      throw new Error('Error en la respuesta de la red');
+    }
+
+    const data = await response.json();
+    console.log('Consulta registrada:', data);
+  } catch (error) {
+    console.error('Error al registrar la consulta:', error);
+  }
+}
+
+async function registrarConsulta(correoInstitucional, numeroPatente) {
+  try {
+    const response = await fetch('http://localhost:3000/consultasRegistradas', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ correoInstitucional, numeroPatente })
+    });
+
+    if (!response.ok) {
+      throw new Error('Error en la respuesta de la red');
+    }
+
+    const data = await response.json();
+    console.log('Consulta registrada:', data);
+  } catch (error) {
+    console.error('Error al registrar la consulta:', error);
+  }
+}
+
+async function registrarConsulta(correoUsuario, numeroPatente) {
+  try {
+    const response = await fetch('http://localhost:3000/consultasRegistradas', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ correoUsuario, numeroPatente })
+    });
+
+    if (!response.ok) {
+      throw new Error('Error en la respuesta de la red');
+    }
+
+    const data = await response.json();
+    console.log('Consulta registrada:', data);
+  } catch (error) {
+    console.error('Error al registrar la consulta:', error);
   }
 }
