@@ -199,47 +199,6 @@ async function buscarPorPatente(numeroPatente) {
   }
 }
 
-async function registrarConsulta(correoUsuario, numeroPatente) {
-  try {
-    const response = await fetch('http://localhost:3000/consultasRegistradas', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({ correoUsuario, numeroPatente })
-    });
-
-    if (!response.ok) {
-      throw new Error('Error en la respuesta de la red');
-    }
-
-    const data = await response.json();
-    console.log('Consulta registrada:', data);
-  } catch (error) {
-    console.error('Error al registrar la consulta:', error);
-  }
-}
-
-async function registrarConsulta(correoInstitucional, numeroPatente) {
-  try {
-    const response = await fetch('http://localhost:3000/consultasRegistradas', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({ correoInstitucional, numeroPatente })
-    });
-
-    if (!response.ok) {
-      throw new Error('Error en la respuesta de la red');
-    }
-
-    const data = await response.json();
-    console.log('Consulta registrada:', data);
-  } catch (error) {
-    console.error('Error al registrar la consulta:', error);
-  }
-}
 
 async function registrarConsulta(correoUsuario, numeroPatente) {
   try {
