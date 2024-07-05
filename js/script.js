@@ -1,3 +1,6 @@
+// URL base del nuevo servidor en Render
+const BASE_URL = 'https://conexion-patentesd.onrender.com';
+
 document.addEventListener('DOMContentLoaded', function () {
   const toggler = document.getElementById('navbar-toggler');
   const navMenu = document.getElementById('navbar-nav');
@@ -112,7 +115,7 @@ window.logout = function () {
 
 async function iniciarSesion(correoInstitucional, contraseña) {
   try {
-    const response = await fetch('http://localhost:3000/usuarios');
+    const response = await fetch(`${BASE_URL}/usuarios`);
     if (!response.ok) {
       throw new Error('Error en la respuesta de la red');
     }
@@ -139,7 +142,7 @@ async function iniciarSesion(correoInstitucional, contraseña) {
 
 async function registrarUsuario(usuario) {
   try {
-    const response = await fetch('http://localhost:3000/usuarios', {
+    const response = await fetch(`${BASE_URL}/usuarios`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
@@ -169,7 +172,7 @@ async function buscarPorPatente(numeroPatente) {
     }
 
     // Buscar el usuario por número de patente
-    const response = await fetch(`http://localhost:3000/buscarPorPatente/${numeroPatente}`);
+    const response = await fetch(`${BASE_URL}/buscarPorPatente/${numeroPatente}`);
     if (!response.ok) {
       throw new Error('Error en la respuesta de la red');
     }
@@ -199,10 +202,9 @@ async function buscarPorPatente(numeroPatente) {
   }
 }
 
-
 async function registrarConsulta(correoUsuario, numeroPatente) {
   try {
-    const response = await fetch('http://localhost:3000/consultasRegistradas', {
+    const response = await fetch(`${BASE_URL}/consultasRegistradas`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
