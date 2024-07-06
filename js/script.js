@@ -122,7 +122,7 @@ async function iniciarSesion(correoInstitucional, contraseña) {
 
     const usuarios = await response.json();
     const usuarioEncontrado = usuarios.find(usuario =>
-      usuario.correoInstitucional === correoInstitucional &&
+      usuario.correoInstitucional.toLowerCase() === correoInstitucional.toLowerCase() &&
       usuario.contraseña === contraseña
     );
 
