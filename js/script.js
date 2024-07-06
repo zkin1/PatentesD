@@ -173,17 +173,26 @@ async function buscarPorPatente(numeroPatente) {
 
     // Buscar el usuario por número de patente
     const response = await fetch(`${BASE_URL}/buscarPorPatente/${numeroPatente}`);
+    
+    const resultadosDiv = document.getElementById('search-results');
+    resultadosDiv.innerHTML = ''; // Limpiar los resultados anteriores
+    resultadosDiv.style.display = 'block';
+
+    if (response.status === 404) {
+      // La patente no fue encontrada
+      resultadosDiv.innerHTML = `
+        <p>Patente aún no registrada</p>
+      `;
+      return;
+    }
+
     if (!response.ok) {
-      throw new Error('Error en la respuesta de la red');
+      throw new Error(`Error en la respuesta de la red: ${response.status} ${response.statusText}`);
     }
 
     const usuarioEncontrado = await response.json();
 
-    const resultadosDiv = document.getElementById('search-results');
-    resultadosDiv.innerHTML = ''; // Limpiar los resultados anteriores
-
-    if (usuarioEncontrado) {
-      resultadosDiv.style.display = 'block';
+    if (usuarioEncontrado && usuarioEncontrado.nombre) {
       resultadosDiv.innerHTML = `
         <p>Nombre: ${usuarioEncontrado.nombre}</p>
         <p>Número de Teléfono: ${usuarioEncontrado.numeroTelefono}</p>
@@ -193,8 +202,10 @@ async function buscarPorPatente(numeroPatente) {
       // Registrar la consulta después de la búsqueda
       await registrarConsulta(usuarioLogueado.correoInstitucional, numeroPatente);
     } else {
-      resultadosDiv.style.display = 'block';
-      resultadosDiv.innerHTML = '<p>No se encontró ningún usuario con esa patente.</p>';
+      resultadosDiv.innerHTML = `
+        <p>No se encontró información para la patente</p>
+        <p>Número de Patente: ${numeroPatente}</p>
+      `;
     }
   } catch (error) {
     console.error('Error:', error);
