@@ -1,7 +1,7 @@
 // URL base del nuevo servidor en Render
 const BASE_URL = 'https://conexion-patentesd.onrender.com';
 
-document.addEventListener('DOMContentLoaded', function () {
+document.addEventListener('DOMContentLoaded', async function () {
   const toggler = document.getElementById('navbar-toggler');
   const navMenu = document.getElementById('navbar-nav');
 
@@ -11,9 +11,16 @@ document.addEventListener('DOMContentLoaded', function () {
     });
   }
 
+  const usuarioLogueado = JSON.parse(localStorage.getItem('usuarioLogueado'));
+  if (usuarioLogueado) {
+    const sesionValida = await verificarSesion(usuarioLogueado.correoInstitucional);
+    if (!sesionValida) {
+      localStorage.removeItem('usuarioLogueado');
+    }
+  }
+
   updateNavBar();
 
-  const usuarioLogueado = JSON.parse(localStorage.getItem('usuarioLogueado'));
   const searchContainer = document.getElementById('search-container');
   const notLoggedInMessage = document.getElementById('not-logged-in-message');
 
@@ -167,7 +174,17 @@ async function buscarPorPatente(numeroPatente) {
   try {
     const usuarioLogueado = JSON.parse(localStorage.getItem('usuarioLogueado'));
     if (!usuarioLogueado) {
-      alert('Debe iniciar sesión para buscar por patente.');
+      alert('La sesión ha expirado. Por favor, inicie sesión nuevamente.');
+      window.location.href = 'login.html';
+      return;
+    }
+
+    // Verificar la sesión con el servidor
+    const sesionValida = await verificarSesion(usuarioLogueado.correoInstitucional);
+    if (!sesionValida) {
+      alert('La sesión ha expirado. Por favor, inicie sesión nuevamente.');
+      localStorage.removeItem('usuarioLogueado');
+      window.location.href = 'login.html';
       return;
     }
 
@@ -231,5 +248,21 @@ async function registrarConsulta(correoUsuario, numeroPatente) {
     console.log('Consulta registrada:', data);
   } catch (error) {
     console.error('Error al registrar la consulta:', error);
+  }
+}
+
+async function verificarSesion(correoInstitucional) {
+  try {
+    const response = await fetch(`${BASE_URL}/verificarSesion`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ correoInstitucional })
+    });
+    return response.ok;
+  } catch (error) {
+    console.error('Error al verificar sesión:', error);
+    return false;
   }
 }
