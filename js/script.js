@@ -78,6 +78,7 @@ document.addEventListener('DOMContentLoaded', async function () {
       const usuarioLogueado = JSON.parse(localStorage.getItem('usuarioLogueado'));
       if (!usuarioLogueado) {
         alert('Debe iniciar sesión para buscar por patente.');
+        window.location.href = 'login.html';
         return;
       }
 
@@ -149,6 +150,15 @@ async function iniciarSesion(correoInstitucional, contraseña) {
 
 async function registrarUsuario(usuario) {
   try {
+    // Primero, verificar si la patente ya existe
+    const verificacionResponse = await fetch(`${BASE_URL}/verificarPatente/${usuario.numeroPatente}`);
+    if (verificacionResponse.status === 200) {
+      // La patente ya existe
+      alert('Error en el registro: La patente ya está registrada.');
+      return;
+    }
+
+    // Si la patente no existe, proceder con el registro
     const response = await fetch(`${BASE_URL}/usuarios`, {
       method: 'POST',
       headers: {
@@ -174,7 +184,7 @@ async function buscarPorPatente(numeroPatente) {
   try {
     const usuarioLogueado = JSON.parse(localStorage.getItem('usuarioLogueado'));
     if (!usuarioLogueado) {
-      alert('La sesión ha expirado. Por favor, inicie sesión nuevamente.');
+      alert('Debe iniciar sesión para buscar por patente.');
       window.location.href = 'login.html';
       return;
     }
