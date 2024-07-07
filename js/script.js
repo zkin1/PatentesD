@@ -1,6 +1,12 @@
 // URL base del nuevo servidor en Render
 const BASE_URL = 'https://conexion-patentesd.onrender.com';
 
+function validarPatente(patente) {
+  const formatoAntiguo = /^[A-Z]{2}\d{4}$/;
+  const formatoNuevo = /^[A-Z]{4}\d{2}$/;
+  return formatoAntiguo.test(patente) || formatoNuevo.test(patente);
+}
+
 document.addEventListener('DOMContentLoaded', async function () {
   const toggler = document.getElementById('navbar-toggler');
   const navMenu = document.getElementById('navbar-nav');
@@ -58,11 +64,17 @@ document.addEventListener('DOMContentLoaded', async function () {
       const patenteInput = document.getElementById('register-patente');
       const telefonoInput = document.getElementById('register-telefono');
 
+      const numeroPatente = patenteInput.value.toUpperCase();
+      if (!validarPatente(numeroPatente)) {
+        alert('Formato de patente inválido. Use AA1000 o BBBB10.');
+        return;
+      }
+
       const usuario = {
         nombre: nombreInput.value,
         correoInstitucional: emailInput.value,
         contraseña: passwordInput.value,
-        numeroPatente: patenteInput.value,
+        numeroPatente: numeroPatente,
         numeroTelefono: telefonoInput.value
       };
 
@@ -83,7 +95,12 @@ document.addEventListener('DOMContentLoaded', async function () {
       }
 
       const patenteInput = document.getElementById('patente-input');
-      const numeroPatente = patenteInput.value.trim();
+      const numeroPatente = patenteInput.value.trim().toUpperCase();
+
+      if (!validarPatente(numeroPatente)) {
+        alert('Formato de patente inválido. Use AA1000 o BBBB10.');
+        return;
+      }
 
       if (numeroPatente) {
         buscarPorPatente(numeroPatente);
@@ -150,6 +167,11 @@ async function iniciarSesion(correoInstitucional, contraseña) {
 
 async function registrarUsuario(usuario) {
   try {
+    if (!validarPatente(usuario.numeroPatente)) {
+      alert('Error en el registro: Formato de patente inválido. Use AA1000 o BBBB10.');
+      return;
+    }
+
     // Primero, verificar si la patente ya existe
     const verificacionResponse = await fetch(`${BASE_URL}/verificarPatente/${usuario.numeroPatente}`);
     if (verificacionResponse.status === 200) {
@@ -182,6 +204,11 @@ async function registrarUsuario(usuario) {
 
 async function buscarPorPatente(numeroPatente) {
   try {
+    if (!validarPatente(numeroPatente)) {
+      alert('Formato de patente inválido. Use AA1000 o BBBB10.');
+      return;
+    }
+
     const usuarioLogueado = JSON.parse(localStorage.getItem('usuarioLogueado'));
     if (!usuarioLogueado) {
       alert('Debe iniciar sesión para buscar por patente.');
