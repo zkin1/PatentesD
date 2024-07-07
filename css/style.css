@@ -13,6 +13,11 @@ input {
   font-family: "Poppins", sans-serif;
 }
 
+html {
+  min-height: 100%;
+  position: relative;
+}
+
 main {
   width: 100%;
   min-height: 100vh;
@@ -272,4 +277,28 @@ main.sign-up-mode .forms-wrap {
 
 scan{
     color: yellow;
+}
+
+.footer {
+  flex-shrink: 0;
+  background-color: #f8f9fa;
+  padding: 20px 0;
+  text-align: center;
+  position: absolute;
+  bottom: 0;
+  width: 100%;
+  height: 40px;
+  border-top: 1px solid #e7e7e7;
+}
+
+.footer-content {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 0 20px;
+}
+
+.footer p {
+  margin: 0;
+  color: #6c757d;
+  font-size: 14px;
 }
