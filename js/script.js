@@ -1,305 +1,265 @@
-// URL base del nuevo servidor en Render
-const BASE_URL = 'https://conexion-patentesd.onrender.com';
+const BASE_URL = 'http://localhost:3000';
+const APP_URL = '/html'; // Ajusta esto según tu configuración
 
-function validarPatente(patente) {
-  const formatoAntiguo = /^[A-Z]{2}\d{4}$/;
-  const formatoNuevo = /^[A-Z]{4}\d{2}$/;
-  return formatoAntiguo.test(patente) || formatoNuevo.test(patente);
-}
+// Funciones de utilidad
+const $ = (selector) => document.querySelector(selector);
+const $$ = (selector) => document.querySelectorAll(selector);
+const validarPatente = (patente) => /^[A-Z]{2}\d{4}$|^[A-Z]{4}\d{2}$/.test(patente);
 
-document.addEventListener('DOMContentLoaded', async function () {
-  const toggler = document.getElementById('navbar-toggler');
-  const navMenu = document.getElementById('navbar-nav');
-
-  if (toggler) {
-    toggler.addEventListener('click', function () {
-      navMenu.classList.toggle('active');
-    });
-  }
-
-  const usuarioLogueado = JSON.parse(localStorage.getItem('usuarioLogueado'));
-  if (usuarioLogueado) {
-    const sesionValida = await verificarSesion(usuarioLogueado.correoInstitucional);
-    if (!sesionValida) {
-      localStorage.removeItem('usuarioLogueado');
+// Gestión del estado de la aplicación
+const AppState = {
+  usuario: JSON.parse(localStorage.getItem('usuarioLogueado')) || null,
+  ultimaBusqueda: JSON.parse(localStorage.getItem('ultimaBusqueda')) || null,
+  setUsuario(usuario) {
+    this.usuario = usuario;
+    localStorage.setItem('usuarioLogueado', JSON.stringify(usuario));
+    this.actualizarUI();
+  },
+  setUltimaBusqueda(busqueda) {
+    this.ultimaBusqueda = busqueda;
+    localStorage.setItem('ultimaBusqueda', JSON.stringify(busqueda));
+  },
+  logout() {
+    this.usuario = null;
+    localStorage.removeItem('usuarioLogueado');
+    this.limpiarResultadosBusqueda();
+    this.actualizarUI();
+    mostrarMensaje('Sesión cerrada exitosamente', 'success');
+    setTimeout(() => {
+      window.location.href = `${APP_URL}/index.html`;
+    }, 1500);
+  },
+  actualizarUI() {
+    updateNavBar();
+    toggleSearchFormVisibility();
+    mostrarUltimaBusqueda();
+  },
+  limpiarResultadosBusqueda() {
+    this.ultimaBusqueda = null;
+    localStorage.removeItem('ultimaBusqueda');
+    const searchResults = $('#search-results');
+    if (searchResults) {
+      searchResults.innerHTML = '';
+      searchResults.style.display = 'none';
     }
   }
+};
 
-  updateNavBar();
-
-  const searchContainer = document.getElementById('search-container');
-  const notLoggedInMessage = document.getElementById('not-logged-in-message');
-
-  if (usuarioLogueado) {
-    if (searchContainer) searchContainer.style.display = 'block';
-    if (notLoggedInMessage) notLoggedInMessage.style.display = 'none';
-  } else {
-    if (searchContainer) searchContainer.style.display = 'none';
-    if (notLoggedInMessage) notLoggedInMessage.style.display = 'block';
-  }
-
-  const loginForm = document.querySelector('.sign-in-form');
-  if (loginForm) {
-    loginForm.addEventListener('submit', function (e) {
-      e.preventDefault();
-
-      const emailInput = document.getElementById('login-email');
-      const passwordInput = document.getElementById('login-password');
-
-      const correoInstitucional = emailInput.value;
-      const contraseña = passwordInput.value;
-
-      iniciarSesion(correoInstitucional, contraseña);
-    });
-  }
-
-  const registerForm = document.querySelector('.register-in-form');
-  if (registerForm) {
-    registerForm.addEventListener('submit', function (e) {
-      e.preventDefault();
-
-      const nombreInput = document.getElementById('register-nombre');
-      const emailInput = document.getElementById('register-email');
-      const passwordInput = document.getElementById('register-password');
-      const patenteInput = document.getElementById('register-patente');
-      const telefonoInput = document.getElementById('register-telefono');
-
-      const numeroPatente = patenteInput.value.toUpperCase();
-      if (!validarPatente(numeroPatente)) {
-        alert('Formato de patente inválido. Use AA1000 o BBBB10.');
-        return;
-      }
-
-      const usuario = {
-        nombre: nombreInput.value,
-        correoInstitucional: emailInput.value,
-        contraseña: passwordInput.value,
-        numeroPatente: numeroPatente,
-        numeroTelefono: telefonoInput.value
-      };
-
-      registrarUsuario(usuario);
-    });
-  }
-
-  const searchForm = document.querySelector('.search-form');
-  if (searchForm) {
-    searchForm.addEventListener('submit', function (e) {
-      e.preventDefault();
-
-      const usuarioLogueado = JSON.parse(localStorage.getItem('usuarioLogueado'));
-      if (!usuarioLogueado) {
-        alert('Debe iniciar sesión para buscar por patente.');
-        window.location.href = 'login.html';
-        return;
-      }
-
-      const patenteInput = document.getElementById('patente-input');
-      const numeroPatente = patenteInput.value.trim().toUpperCase();
-
-      if (!validarPatente(numeroPatente)) {
-        alert('Formato de patente inválido. Use AA1000 o BBBB10.');
-        return;
-      }
-
-      if (numeroPatente) {
-        buscarPorPatente(numeroPatente);
-      }
-    });
-  }
+// Inicialización de la aplicación
+document.addEventListener('DOMContentLoaded', () => {
+  console.log('DOM cargado, inicializando aplicación');
+  AppState.actualizarUI();
+  setupEventListeners();
 });
 
+function setupEventListeners() {
+  console.log('Configurando event listeners');
+  $('#navbar-toggler')?.addEventListener('click', toggleNavbar);
+  $('.sign-in-form')?.addEventListener('submit', handleLogin);
+  $('.register-in-form')?.addEventListener('submit', handleRegister);
+  $('.search-form')?.addEventListener('submit', handleSearch);
+  $('#logout-link')?.addEventListener('click', (e) => {
+    e.preventDefault();
+    AppState.logout();
+  });
+}
+
 function updateNavBar() {
-  const userInfo = document.getElementById('user-info');
-  const usernameDisplay = document.getElementById('username-display');
-  const loginLink = document.getElementById('login-link');
-  const registroLink = document.getElementById('registro-link');
-  const logoutLink = document.getElementById('logout-link');
+  const isLoggedIn = !!AppState.usuario;
+  const elements = {
+    userInfo: $('#user-info'),
+    usernameDisplay: $('#username-display'),
+    loginLink: $('#login-link'),
+    registroLink: $('#registro-link'),
+    logoutLink: $('#logout-link'),
+    searchWrap: $('.search-wrap')
+  };
 
-  const usuario = JSON.parse(localStorage.getItem('usuarioLogueado'));
+  Object.entries(elements).forEach(([key, element]) => {
+    if (element) {
+      switch (key) {
+        case 'userInfo':
+          element.style.display = isLoggedIn ? 'block' : 'none';
+          break;
+        case 'usernameDisplay':
+          if (isLoggedIn) element.textContent = AppState.usuario.nombre;
+          break;
+        case 'loginLink':
+        case 'registroLink':
+          element.style.display = isLoggedIn ? 'none' : 'block';
+          break;
+        case 'logoutLink':
+          element.style.display = isLoggedIn ? 'block' : 'none';
+          break;
+        case 'searchWrap':
+          element.style.display = 'block'; // Siempre visible
+          break;
+      }
+    }
+  });
+}
 
-  if (usuario) {
-    if (userInfo) userInfo.style.display = 'block';
-    if (usernameDisplay) usernameDisplay.textContent = usuario.nombre;
-    if (loginLink) loginLink.style.display = 'none';
-    if (registroLink) registroLink.style.display = 'none';
-    if (logoutLink) logoutLink.style.display = 'block';
-  } else {
-    if (userInfo) userInfo.style.display = 'none';
-    if (loginLink) loginLink.style.display = 'block';
-    if (registroLink) registroLink.style.display = 'block';
-    if (logoutLink) logoutLink.style.display = 'none';
+function toggleNavbar() {
+  $('#navbar-nav')?.classList.toggle('active');
+}
+
+function toggleSearchFormVisibility() {
+  const searchForm = $('.search-form');
+  const notLoggedInMessage = $('#not-logged-in-message');
+  if (searchForm) {
+    const isLoggedIn = !!AppState.usuario;
+    searchForm.style.display = 'block'; // Siempre visible
+    if (notLoggedInMessage) {
+      notLoggedInMessage.style.display = isLoggedIn ? 'none' : 'block';
+    }
   }
 }
 
-window.logout = function () {
-  localStorage.removeItem('usuarioLogueado');
-  updateNavBar();
-  window.location.href = 'index.html';
+function mostrarMensaje(mensaje, tipo) {
+  const mensajeElement = $('#mensaje');
+  if (mensajeElement) {
+    mensajeElement.textContent = mensaje;
+    mensajeElement.className = `mensaje ${tipo}`;
+    mensajeElement.style.display = 'block';
+    setTimeout(() => { mensajeElement.style.display = 'none'; }, 3000);
+  } else {
+    alert(mensaje);
+  }
 }
 
-async function iniciarSesion(correoInstitucional, contraseña) {
-  try {
-    const response = await fetch(`${BASE_URL}/usuarios`);
-    if (!response.ok) {
-      throw new Error('Error en la respuesta de la red');
+function mostrarUltimaBusqueda() {
+  if (AppState.ultimaBusqueda) {
+    const searchResults = $('#search-results');
+    if (searchResults) {
+      searchResults.innerHTML = AppState.ultimaBusqueda.html;
+      searchResults.style.display = 'block';
     }
+  }
+}
 
-    const usuarios = await response.json();
-    const usuarioEncontrado = usuarios.find(usuario =>
-      usuario.correoInstitucional.toLowerCase() === correoInstitucional.toLowerCase() &&
-      usuario.contraseña === contraseña
-    );
-
-    if (usuarioEncontrado) {
-      localStorage.setItem('usuarioLogueado', JSON.stringify(usuarioEncontrado));
-      alert('Inicio de sesión exitoso');
-      updateNavBar();
-      window.location.href = 'index.html';
+async function handleLogin(e) {
+  e.preventDefault();
+  const correoInstitucional = $('#login-email').value;
+  const contraseña = $('#login-password').value;
+  try {
+    const response = await fetch(`${BASE_URL}/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ correoInstitucional, contraseña })
+    });
+    const data = await response.json();
+    if (data.valido) {
+      AppState.setUsuario({
+        nombre: data.usuario.nombre,
+        correoInstitucional: data.usuario.correoInstitucional
+      });
+      mostrarMensaje('Inicio de sesión exitoso', 'success');
+      setTimeout(() => {
+        window.location.href = `${APP_URL}/index.html`;
+      }, 1500);
     } else {
-      alert('Error en el inicio de sesión: Credenciales inválidas');
+      mostrarMensaje('Credenciales inválidas', 'error');
     }
   } catch (error) {
-    console.error('Error:', error);
-    alert('Error en el inicio de sesión: ' + error.message);
+    mostrarMensaje('Error en el inicio de sesión: ' + error.message, 'error');
   }
 }
 
-async function registrarUsuario(usuario) {
+async function handleRegister(e) {
+  e.preventDefault();
+  const usuario = {
+    nombre: $('#register-nombre').value,
+    correoInstitucional: $('#register-email').value,
+    contraseña: $('#register-password').value,
+    numeroPatente: $('#register-patente').value.toUpperCase(),
+    numeroTelefono: $('#register-telefono').value
+  };
+  if (!validarPatente(usuario.numeroPatente)) {
+    mostrarMensaje('Formato de patente inválido. Use AA1000 o BBBB10.', 'error');
+    return;
+  }
   try {
-    if (!validarPatente(usuario.numeroPatente)) {
-      alert('Error en el registro: Formato de patente inválido. Use AA1000 o BBBB10.');
-      return;
-    }
-
-    // Primero, verificar si la patente ya existe
     const verificacionResponse = await fetch(`${BASE_URL}/verificarPatente/${usuario.numeroPatente}`);
-    if (verificacionResponse.status === 200) {
-      // La patente ya existe
-      alert('Error en el registro: La patente ya está registrada.');
+    if (verificacionResponse.ok) {
+      mostrarMensaje('La patente ya está registrada.', 'error');
       return;
     }
-
-    // Si la patente no existe, proceder con el registro
     const response = await fetch(`${BASE_URL}/usuarios`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(usuario)
     });
-
-    if (!response.ok) {
-      throw new Error('Error en la respuesta de la red');
+    if (response.ok) {
+      mostrarMensaje('Registro exitoso', 'success');
+      setTimeout(() => {
+        window.location.href = `${APP_URL}/login.html`;
+      }, 1500);
+    } else {
+      throw new Error('Error en el registro');
     }
-
-    const data = await response.json();
-    alert('Registro exitoso');
-    window.location.href = 'login.html';
   } catch (error) {
-    console.error('Error:', error);
-    alert('Error en el registro: ' + error.message);
+    mostrarMensaje('Error en el registro: ' + error.message, 'error');
   }
+}
+
+async function handleSearch(e) {
+  e.preventDefault();
+  const numeroPatente = $('#patente-input').value.trim().toUpperCase();
+  if (!validarPatente(numeroPatente)) {
+    mostrarMensaje('Formato de patente inválido. Use AA1000 o BBBB10.', 'error');
+    return;
+  }
+  if (!AppState.usuario) {
+    mostrarMensaje('Debe iniciar sesión para buscar por patente.', 'error');
+    return;
+  }
+  await buscarPorPatente(numeroPatente);
 }
 
 async function buscarPorPatente(numeroPatente) {
+  const searchResults = $('#search-results');
   try {
-    if (!validarPatente(numeroPatente)) {
-      alert('Formato de patente inválido. Use AA1000 o BBBB10.');
-      return;
-    }
-
-    const usuarioLogueado = JSON.parse(localStorage.getItem('usuarioLogueado'));
-    if (!usuarioLogueado) {
-      alert('Debe iniciar sesión para buscar por patente.');
-      window.location.href = 'login.html';
-      return;
-    }
-
-    // Verificar la sesión con el servidor
-    const sesionValida = await verificarSesion(usuarioLogueado.correoInstitucional);
-    if (!sesionValida) {
-      alert('La sesión ha expirado. Por favor, inicie sesión nuevamente.');
-      localStorage.removeItem('usuarioLogueado');
-      window.location.href = 'login.html';
-      return;
-    }
-
-    // Buscar el usuario por número de patente
     const response = await fetch(`${BASE_URL}/buscarPorPatente/${numeroPatente}`);
-    
-    const resultadosDiv = document.getElementById('search-results');
-    resultadosDiv.innerHTML = ''; // Limpiar los resultados anteriores
-    resultadosDiv.style.display = 'block';
-
+    let resultadoHTML = '';
     if (response.status === 404) {
-      // La patente no fue encontrada
-      resultadosDiv.innerHTML = `
-        <p>Patente aún no registrada</p>
-      `;
-      return;
-    }
-
-    if (!response.ok) {
-      throw new Error(`Error en la respuesta de la red: ${response.status} ${response.statusText}`);
-    }
-
-    const usuarioEncontrado = await response.json();
-
-    if (usuarioEncontrado && usuarioEncontrado.nombre) {
-      resultadosDiv.innerHTML = `
-        <p>Nombre: ${usuarioEncontrado.nombre}</p>
-        <p>Número de Teléfono: ${usuarioEncontrado.numeroTelefono}</p>
-        <p>Patente: ${usuarioEncontrado.numeroPatente}</p>
-      `;
-
-      // Registrar la consulta después de la búsqueda
-      await registrarConsulta(usuarioLogueado.correoInstitucional, numeroPatente);
+      resultadoHTML = '<p>Patente aún no registrada</p>';
+    } else if (response.ok) {
+      const usuarioEncontrado = await response.json();
+      if (usuarioEncontrado && usuarioEncontrado.nombre) {
+        resultadoHTML = `
+          <p>Nombre: ${usuarioEncontrado.nombre}</p>
+          <p>Número de Teléfono: ${usuarioEncontrado.numeroTelefono}</p>
+          <p>Patente: ${usuarioEncontrado.numeroPatente}</p>
+        `;
+        await registrarConsulta(AppState.usuario.correoInstitucional, numeroPatente);
+      } else {
+        resultadoHTML = `<p>No se encontró información para la patente ${numeroPatente}</p>`;
+      }
     } else {
-      resultadosDiv.innerHTML = `
-        <p>No se encontró información para la patente</p>
-        <p>Número de Patente: ${numeroPatente}</p>
-      `;
+      throw new Error(`Error en la respuesta del servidor: ${response.status}`);
     }
+    searchResults.innerHTML = resultadoHTML;
+    searchResults.style.display = 'block';
+    AppState.setUltimaBusqueda({ html: resultadoHTML, patente: numeroPatente });
   } catch (error) {
-    console.error('Error:', error);
-    alert('Error en la búsqueda: ' + error.message);
+    searchResults.innerHTML = `<p>Error: ${error.message}</p>`;
+    AppState.setUltimaBusqueda({ html: searchResults.innerHTML, patente: numeroPatente });
   }
+  console.log('Búsqueda completada, resultados mostrados');
 }
 
 async function registrarConsulta(correoUsuario, numeroPatente) {
   try {
     const response = await fetch(`${BASE_URL}/consultasRegistradas`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ correoUsuario, numeroPatente })
     });
-
     if (!response.ok) {
-      throw new Error('Error en la respuesta de la red');
+      throw new Error('Error al registrar la consulta');
     }
-
-    const data = await response.json();
-    console.log('Consulta registrada:', data);
+    console.log('Consulta registrada exitosamente');
   } catch (error) {
     console.error('Error al registrar la consulta:', error);
-  }
-}
-
-async function verificarSesion(correoInstitucional) {
-  try {
-    const response = await fetch(`${BASE_URL}/verificarSesion`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({ correoInstitucional })
-    });
-    return response.ok;
-  } catch (error) {
-    console.error('Error al verificar sesión:', error);
-    return false;
   }
 }
