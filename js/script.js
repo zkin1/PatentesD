@@ -151,7 +151,8 @@ async function handleLogin(e) {
     if (data.valido) {
       AppState.setUsuario({
         nombre: data.usuario.nombre,
-        correoInstitucional: data.usuario.correoInstitucional
+        correoInstitucional: data.usuario.correoInstitucional,
+        token: data.token 
       });
       mostrarMensaje('Inicio de sesión exitoso', 'success');
       setTimeout(() => {
@@ -219,8 +220,15 @@ async function handleSearch(e) {
 async function buscarPorPatente(numeroPatente) {
   const searchResults = $('#search-results');
   try {
-    const response = await fetch(`${BASE_URL}/buscarPorPatente/${numeroPatente}`);
-    let resultadoHTML = '';
+    const headers = {
+      'Content-Type': 'application/json'
+    };
+    if (AppState.usuario && AppState.usuario.token) {
+      headers['Authorization'] = `Bearer ${AppState.usuario.token}`;
+    }
+    const response = await fetch(`${BASE_URL}/buscarPorPatente/${numeroPatente}`, {
+      headers: headers
+    });
     if (response.status === 404) {
       resultadoHTML = '<p>Patente aún no registrada</p>';
     } else if (response.ok) {
@@ -247,6 +255,7 @@ async function buscarPorPatente(numeroPatente) {
   }
   console.log('Búsqueda completada, resultados mostrados');
 }
+
 
 async function registrarConsulta(correoUsuario, numeroPatente) {
   try {

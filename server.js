@@ -38,7 +38,10 @@ const authenticateToken = (req, res, next) => {
   if (token == null) return res.sendStatus(401);
 
   jwt.verify(token, process.env.JWT_SECRET, (err, user) => {
-    if (err) return res.sendStatus(403);
+    if (err) {
+      console.error('Error al verificar el token:', err);
+      return res.sendStatus(403);
+    }
     req.user = user;
     next();
   });
@@ -149,14 +152,18 @@ app.get('/buscarPorPatente/:numeroPatente', authenticateToken, [
   }
 
   const numeroPatente = req.params.numeroPatente;
+  console.log('Buscando patente:', numeroPatente);
   db.get('SELECT id, nombre, numeroPatente, numeroTelefono, correoInstitucional FROM usuarios WHERE numeroPatente = ?', [numeroPatente], (err, row) => {
     if (err) {
+      console.error('Error en la consulta a la base de datos:', err);
       res.status(500).json({ error: err.message });
       return;
     }
     if (row) {
+      console.log('Usuario encontrado:', row);
       res.json(row);
     } else {
+      console.log('Usuario no encontrado');
       res.status(404).json({ message: 'Usuario no encontrado' });
     }
   });
