@@ -7,12 +7,14 @@ const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const { body, param, validationResult } = require('express-validator');
 const rateLimit = require('express-rate-limit');
+const helmet = require('helmet');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
 app.use(cors());
 app.use(bodyParser.json());
+app.use(helmet());
 
 // Rate limiting
 const limiter = rateLimit({
@@ -73,38 +75,66 @@ app.get('/verificarPatente/:numeroPatente', [
       res.status(500).json({ error: 'Error al verificar la patente' });
       return;
     }
-    res.status(row ? 200 : 404).json({ existe: !!row });
+    res.status(200).json({ existe: !!row });
   });
 });
 
 // Ruta para registrar un nuevo usuario
 app.post('/usuarios', [
-  body('nombre').isString().trim().escape(),
-  body('contraseña').isLength({ min: 6 }),
-  body('numeroPatente').isAlphanumeric().isLength({ min: 6, max: 6 }),
-  body('numeroTelefono').isMobilePhone(),
-  body('correoInstitucional').isEmail()
+  body('nombre').isString().trim().notEmpty().withMessage('El nombre es requerido'),
+  body('correoInstitucional').isEmail().withMessage('Correo institucional inválido'),
+  body('contraseña').isLength({ min: 6 }).withMessage('La contraseña debe tener al menos 6 caracteres'),
+  body('numeroPatente').custom((value) => {
+    if (!/^[A-Z]{2}\d{4}$|^[A-Z]{4}\d{2}$/.test(value)) {
+      throw new Error('Formato de patente inválido');
+    }
+    return true;
+  }),
+  body('numeroTelefono').isMobilePhone().withMessage('Número de teléfono inválido')
 ], async (req, res) => {
+  console.log('Datos recibidos:', req.body);
+  
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
     return res.status(400).json({ errors: errors.array() });
   }
 
-  const { nombre, contraseña, numeroPatente, numeroTelefono, correoInstitucional } = req.body;
+  const { nombre, correoInstitucional, contraseña, numeroPatente, numeroTelefono } = req.body;
+
   try {
-    const hashedPassword = await bcrypt.hash(contraseña, 10);
-    db.run('INSERT INTO usuarios (nombre, contraseña, numeroPatente, numeroTelefono, correoInstitucional) VALUES (?, ?, ?, ?, ?)',
-      [nombre, hashedPassword, numeroPatente, numeroTelefono, correoInstitucional],
-      function(err) {
-        if (err) {
-          res.status(500).json({ error: err.message });
-          return;
-        }
-        res.status(201).json({ id: this.lastID, nombre, numeroPatente, numeroTelefono, correoInstitucional });
+    // Verificar si ya existe un usuario con el mismo correo o patente
+    const existingUser = await new Promise((resolve, reject) => {
+      db.get('SELECT * FROM usuarios WHERE correoInstitucional = ? OR numeroPatente = ?', 
+        [correoInstitucional, numeroPatente], (err, row) => {
+        if (err) reject(err);
+        else resolve(row);
+      });
+    });
+
+    if (existingUser) {
+      if (existingUser.correoInstitucional === correoInstitucional) {
+        return res.status(409).json({ error: 'Ya existe un usuario con este correo institucional' });
+      } else {
+        return res.status(409).json({ error: 'Ya existe un usuario con esta patente' });
       }
-    );
+    }
+
+    const hashedPassword = await bcrypt.hash(contraseña, 10);
+
+    await new Promise((resolve, reject) => {
+      db.run('INSERT INTO usuarios (nombre, contraseña, numeroPatente, numeroTelefono, correoInstitucional) VALUES (?, ?, ?, ?, ?)',
+        [nombre, hashedPassword, numeroPatente, numeroTelefono, correoInstitucional],
+        function(err) {
+          if (err) reject(err);
+          else resolve(this.lastID);
+        }
+      );
+    });
+
+    res.status(201).json({ message: 'Usuario registrado exitosamente' });
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    console.error('Error al registrar usuario:', error);
+    res.status(500).json({ error: 'Error interno del servidor al registrar el usuario' });
   }
 });
 
@@ -193,13 +223,13 @@ app.post('/login', [
     if (row && await bcrypt.compare(contraseña, row.contraseña)) {
       console.log('Autenticación exitosa');
       const token = jwt.sign({ id: row.id, correoInstitucional: row.correoInstitucional }, process.env.JWT_SECRET, { expiresIn: '1h' });
-      res.json({ 
+      res.json({
         valido: true,
-        token, 
-        usuario: { 
-          nombre: row.nombre, 
-          correoInstitucional: row.correoInstitucional 
-        } 
+        token,
+        usuario: {
+          nombre: row.nombre,
+          correoInstitucional: row.correoInstitucional
+        }
       });
     } else {
       console.log('Autenticación fallida');

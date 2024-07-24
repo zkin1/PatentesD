@@ -1,5 +1,5 @@
 const BASE_URL = 'http://localhost:3000';
-const APP_URL = '/html'; // Ajusta esto según tu configuración
+const APP_URL = '/html'; 
 
 // Funciones de utilidad
 const $ = (selector) => document.querySelector(selector);
@@ -121,7 +121,21 @@ function mostrarMensaje(mensaje, tipo) {
     mensajeElement.textContent = mensaje;
     mensajeElement.className = `mensaje ${tipo}`;
     mensajeElement.style.display = 'block';
-    setTimeout(() => { mensajeElement.style.display = 'none'; }, 3000);
+    mensajeElement.style.opacity = '1';
+    
+    // Animación de desvanecimiento
+    setTimeout(() => {
+      let opacity = 1;
+      const fadeInterval = setInterval(() => {
+        if (opacity <= 0) {
+          clearInterval(fadeInterval);
+          mensajeElement.style.display = 'none';
+        } else {
+          opacity -= 0.1;
+          mensajeElement.style.opacity = opacity;
+        }
+      }, 50);
+    }, 2500); // Comienza a desvanecerse después de 2.5 segundos
   } else {
     alert(mensaje);
   }
@@ -148,18 +162,18 @@ async function handleLogin(e) {
       body: JSON.stringify({ correoInstitucional, contraseña })
     });
     const data = await response.json();
-    if (data.valido) {
+    if (response.ok) {
       AppState.setUsuario({
         nombre: data.usuario.nombre,
         correoInstitucional: data.usuario.correoInstitucional,
-        token: data.token 
+        token: data.token
       });
       mostrarMensaje('Inicio de sesión exitoso', 'success');
       setTimeout(() => {
         window.location.href = `${APP_URL}/index.html`;
       }, 1500);
     } else {
-      mostrarMensaje('Credenciales inválidas', 'error');
+      mostrarMensaje(data.message || 'Error en el inicio de sesión', 'error');
     }
   } catch (error) {
     mostrarMensaje('Error en el inicio de sesión: ' + error.message, 'error');
@@ -168,40 +182,107 @@ async function handleLogin(e) {
 
 async function handleRegister(e) {
   e.preventDefault();
+  console.log('Iniciando proceso de registro');
+
   const usuario = {
-    nombre: $('#register-nombre').value,
-    correoInstitucional: $('#register-email').value,
+    nombre: $('#register-nombre').value.trim(),
+    correoInstitucional: $('#register-email').value.trim(),
     contraseña: $('#register-password').value,
-    numeroPatente: $('#register-patente').value.toUpperCase(),
-    numeroTelefono: $('#register-telefono').value
+    numeroPatente: $('#register-patente').value.trim().toUpperCase(),
+    numeroTelefono: $('#register-telefono').value.trim()
   };
+
+  console.log('Datos a enviar:', usuario);
+
   if (!validarPatente(usuario.numeroPatente)) {
     mostrarMensaje('Formato de patente inválido. Use AA1000 o BBBB10.', 'error');
     return;
   }
+
   try {
-    const verificacionResponse = await fetch(`${BASE_URL}/verificarPatente/${usuario.numeroPatente}`);
-    if (verificacionResponse.ok) {
-      mostrarMensaje('La patente ya está registrada.', 'error');
-      return;
-    }
+    console.log('Enviando solicitud al servidor');
     const response = await fetch(`${BASE_URL}/usuarios`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(usuario)
     });
+
+    const data = await response.json();
+    console.log('Respuesta del servidor:', data);
+    
     if (response.ok) {
-      mostrarMensaje('Registro exitoso', 'success');
-      setTimeout(() => {
-        window.location.href = `${APP_URL}/login.html`;
-      }, 1500);
+      console.log('Registro exitoso, iniciando sesión automáticamente');
+      mostrarMensaje('Registro exitoso. Iniciando sesión automáticamente', 'success');
+      
+      // Iniciar sesión automáticamente y redirigir a index.html
+      await autoLogin(usuario.correoInstitucional, usuario.contraseña);
     } else {
-      throw new Error('Error en el registro');
+      const errorMessage = data.errors ? data.errors.map(err => err.msg).join(', ') : data.error || 'Error desconocido';
+      console.error('Error en el registro:', errorMessage);
+      mostrarMensaje(`Error en el registro: ${errorMessage}`, 'error');
     }
   } catch (error) {
+    console.error('Error completo:', error);
     mostrarMensaje('Error en el registro: ' + error.message, 'error');
   }
 }
+
+async function autoLogin(correoInstitucional, contraseña) {
+  try {
+    const response = await fetch(`${BASE_URL}/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ correoInstitucional, contraseña })
+    });
+    const data = await response.json();
+    if (response.ok) {
+      AppState.setUsuario({
+        nombre: data.usuario.nombre,
+        correoInstitucional: data.usuario.correoInstitucional,
+        token: data.token
+      });
+      mostrarMensaje('Inicio de sesión exitoso', 'success');
+      
+      setTimeout(() => {
+        window.location.href = `${APP_URL}/index.html`;
+      }, 3000); // Redirigir después de 3 segundos
+    } else {
+      throw new Error(data.message || 'Error en el inicio de sesión automático');
+    }
+  } catch (error) {
+    console.error('Error en el inicio de sesión automático:', error);
+    mostrarMensaje('Error en el inicio de sesión automático. Por favor, intenta iniciar sesión manualmente.', 'error');
+  }
+}
+
+
+async function autoLogin(correoInstitucional, contraseña) {
+  try {
+    const response = await fetch(`${BASE_URL}/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ correoInstitucional, contraseña })
+    });
+    const data = await response.json();
+    if (response.ok) {
+      AppState.setUsuario({
+        nombre: data.usuario.nombre,
+        correoInstitucional: data.usuario.correoInstitucional,
+        token: data.token
+      });
+      mostrarMensaje('Inicio de sesión exitoso', 'success');
+      setTimeout(() => {
+        window.location.href = `${APP_URL}/index.html`;
+      }, 2500 );
+    } else {
+      throw new Error(data.message || 'Error en el inicio de sesión automático');
+    }
+  } catch (error) {
+    console.error('Error en el inicio de sesión automático:', error);
+    mostrarMensaje('Error en el inicio de sesión automático. Por favor, intenta iniciar sesión manualmente.', 'error');
+  }
+}
+
 
 async function handleSearch(e) {
   e.preventDefault();
@@ -221,14 +302,13 @@ async function buscarPorPatente(numeroPatente) {
   const searchResults = $('#search-results');
   try {
     const headers = {
-      'Content-Type': 'application/json'
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${AppState.usuario.token}`
     };
-    if (AppState.usuario && AppState.usuario.token) {
-      headers['Authorization'] = `Bearer ${AppState.usuario.token}`;
-    }
     const response = await fetch(`${BASE_URL}/buscarPorPatente/${numeroPatente}`, {
       headers: headers
     });
+    let resultadoHTML;
     if (response.status === 404) {
       resultadoHTML = '<p>Patente aún no registrada</p>';
     } else if (response.ok) {
@@ -256,12 +336,15 @@ async function buscarPorPatente(numeroPatente) {
   console.log('Búsqueda completada, resultados mostrados');
 }
 
-
 async function registrarConsulta(correoUsuario, numeroPatente) {
   try {
+    const headers = {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${AppState.usuario.token}`
+    };
     const response = await fetch(`${BASE_URL}/consultasRegistradas`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: headers,
       body: JSON.stringify({ correoUsuario, numeroPatente })
     });
     if (!response.ok) {
