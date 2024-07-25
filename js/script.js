@@ -24,10 +24,8 @@ const AppState = {
     localStorage.removeItem('usuarioLogueado');
     this.limpiarResultadosBusqueda();
     this.actualizarUI();
-    mostrarMensaje('Sesión cerrada exitosamente', 'success');
-    setTimeout(() => {
-      window.location.href = `${APP_URL}/index.html`;
-    }, 1500);
+    localStorage.setItem('mensajeLogout', 'Sesión cerrada exitosamente');
+    window.location.href = `${APP_URL}/index.html`;
   },
   actualizarUI() {
     updateNavBar();
@@ -50,6 +48,19 @@ document.addEventListener('DOMContentLoaded', () => {
   console.log('DOM cargado, inicializando aplicación');
   AppState.actualizarUI();
   setupEventListeners();
+
+  // Verificar si hay mensajes pendientes
+  const mensajeLogin = localStorage.getItem('mensajeLogin');
+  if (mensajeLogin) {
+    mostrarMensaje(mensajeLogin, 'success');
+    localStorage.removeItem('mensajeLogin');
+  }
+
+  const mensajeLogout = localStorage.getItem('mensajeLogout');
+  if (mensajeLogout) {
+    mostrarMensaje(mensajeLogout, 'success');
+    localStorage.removeItem('mensajeLogout');
+  }
 });
 
 function setupEventListeners() {
@@ -116,29 +127,30 @@ function toggleSearchFormVisibility() {
 }
 
 function mostrarMensaje(mensaje, tipo) {
-  const mensajeElement = $('#mensaje');
-  if (mensajeElement) {
-    mensajeElement.textContent = mensaje;
-    mensajeElement.className = `mensaje ${tipo}`;
-    mensajeElement.style.display = 'block';
-    mensajeElement.style.opacity = '1';
-    
-    // Animación de desvanecimiento
+  const mensajeElement = document.createElement('div');
+  mensajeElement.textContent = mensaje;
+  mensajeElement.className = `mensaje ${tipo}`;
+  document.body.appendChild(mensajeElement);
+
+  // Estilo para el mensaje
+  mensajeElement.style.position = 'fixed';
+  mensajeElement.style.top = '20px';
+  mensajeElement.style.left = '50%';
+  mensajeElement.style.transform = 'translateX(-50%)';
+  mensajeElement.style.padding = '10px';
+  mensajeElement.style.borderRadius = '5px';
+  mensajeElement.style.backgroundColor = tipo === 'success' ? '#4CAF50' : '#f44336';
+  mensajeElement.style.color = 'white';
+  mensajeElement.style.zIndex = '1000';
+
+  // Desaparecer después de 5 segundos
+  setTimeout(() => {
+    mensajeElement.style.transition = 'opacity 1s';
+    mensajeElement.style.opacity = '0';
     setTimeout(() => {
-      let opacity = 1;
-      const fadeInterval = setInterval(() => {
-        if (opacity <= 0) {
-          clearInterval(fadeInterval);
-          mensajeElement.style.display = 'none';
-        } else {
-          opacity -= 0.1;
-          mensajeElement.style.opacity = opacity;
-        }
-      }, 50);
-    }, 2500); // Comienza a desvanecerse después de 2.5 segundos
-  } else {
-    alert(mensaje);
-  }
+      document.body.removeChild(mensajeElement);
+    }, 1000);
+  }, 5000);
 }
 
 function mostrarUltimaBusqueda() {
@@ -168,10 +180,8 @@ async function handleLogin(e) {
         correoInstitucional: data.usuario.correoInstitucional,
         token: data.token
       });
-      mostrarMensaje('Inicio de sesión exitoso', 'success');
-      setTimeout(() => {
-        window.location.href = `${APP_URL}/index.html`;
-      }, 1500);
+      localStorage.setItem('mensajeLogin', 'Inicio de sesión exitoso');
+      window.location.href = `${APP_URL}/index.html`;
     } else {
       mostrarMensaje(data.message || 'Error en el inicio de sesión', 'error');
     }
@@ -184,17 +194,16 @@ async function handleRegister(e) {
   e.preventDefault();
   console.log('Iniciando proceso de registro');
 
-  const usuario = {
-    nombre: $('#register-nombre').value.trim(),
-    correoInstitucional: $('#register-email').value.trim(),
-    contraseña: $('#register-password').value,
-    numeroPatente: $('#register-patente').value.trim().toUpperCase(),
-    numeroTelefono: $('#register-telefono').value.trim()
-  };
+  const nombre = $('#register-nombre').value.trim();
+  const correoInstitucional = $('#register-email').value.trim();
+  const contraseña = $('#register-password').value;
+  const numeroPatente = $('#register-patente').value.trim().toUpperCase();
+  const numeroTelefono = $('#register-telefono').value.trim();
 
-  console.log('Datos a enviar:', usuario);
+  console.log('Datos a enviar:', { nombre, correoInstitucional, numeroPatente, numeroTelefono });
 
-  if (!validarPatente(usuario.numeroPatente)) {
+  if (!validarPatente(numeroPatente)) {
+    console.log('Patente inválida');
     mostrarMensaje('Formato de patente inválido. Use AA1000 o BBBB10.', 'error');
     return;
   }
@@ -204,18 +213,17 @@ async function handleRegister(e) {
     const response = await fetch(`${BASE_URL}/usuarios`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(usuario)
+      body: JSON.stringify({ nombre, correoInstitucional, contraseña, numeroPatente, numeroTelefono })
     });
 
     const data = await response.json();
     console.log('Respuesta del servidor:', data);
     
     if (response.ok) {
-      console.log('Registro exitoso, iniciando sesión automáticamente');
-      mostrarMensaje('Registro exitoso. Iniciando sesión automáticamente', 'success');
-      
-      // Iniciar sesión automáticamente y redirigir a index.html
-      await autoLogin(usuario.correoInstitucional, usuario.contraseña);
+      console.log('Registro exitoso, preparando para iniciar sesión automáticamente');
+      localStorage.setItem('mensajeLogin', 'Registro exitoso. Inicio de sesión automático');
+      console.log('Iniciando sesión automáticamente');
+      await autoLogin(correoInstitucional, contraseña);
     } else {
       const errorMessage = data.errors ? data.errors.map(err => err.msg).join(', ') : data.error || 'Error desconocido';
       console.error('Error en el registro:', errorMessage);
@@ -228,61 +236,37 @@ async function handleRegister(e) {
 }
 
 async function autoLogin(correoInstitucional, contraseña) {
+  console.log('Iniciando auto-login');
   try {
+    console.log('Enviando solicitud de login');
     const response = await fetch(`${BASE_URL}/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ correoInstitucional, contraseña })
     });
     const data = await response.json();
+    console.log('Respuesta del servidor de login:', data);
+    
     if (response.ok) {
+      console.log('Login exitoso, actualizando AppState');
       AppState.setUsuario({
         nombre: data.usuario.nombre,
         correoInstitucional: data.usuario.correoInstitucional,
         token: data.token
       });
-      mostrarMensaje('Inicio de sesión exitoso', 'success');
+      console.log('AppState actualizado');
       
-      setTimeout(() => {
-        window.location.href = `${APP_URL}/index.html`;
-      }, 3000); // Redirigir después de 3 segundos
+      console.log('Preparando redirección');
+      window.location.href = `${APP_URL}/index.html`;
     } else {
       throw new Error(data.message || 'Error en el inicio de sesión automático');
     }
   } catch (error) {
     console.error('Error en el inicio de sesión automático:', error);
-    mostrarMensaje('Error en el inicio de sesión automático. Por favor, intenta iniciar sesión manualmente.', 'error');
+    localStorage.setItem('mensajeLogin', 'Error en el inicio de sesión automático. Por favor, intenta iniciar sesión manualmente.');
+    window.location.href = `${APP_URL}/index.html`;
   }
 }
-
-
-async function autoLogin(correoInstitucional, contraseña) {
-  try {
-    const response = await fetch(`${BASE_URL}/login`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ correoInstitucional, contraseña })
-    });
-    const data = await response.json();
-    if (response.ok) {
-      AppState.setUsuario({
-        nombre: data.usuario.nombre,
-        correoInstitucional: data.usuario.correoInstitucional,
-        token: data.token
-      });
-      mostrarMensaje('Inicio de sesión exitoso', 'success');
-      setTimeout(() => {
-        window.location.href = `${APP_URL}/index.html`;
-      }, 2500 );
-    } else {
-      throw new Error(data.message || 'Error en el inicio de sesión automático');
-    }
-  } catch (error) {
-    console.error('Error en el inicio de sesión automático:', error);
-    mostrarMensaje('Error en el inicio de sesión automático. Por favor, intenta iniciar sesión manualmente.', 'error');
-  }
-}
-
 
 async function handleSearch(e) {
   e.preventDefault();
