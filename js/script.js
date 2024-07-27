@@ -56,6 +56,12 @@ document.addEventListener('DOMContentLoaded', () => {
     localStorage.removeItem('mensajeLogin');
   }
 
+  const mensajeRegistro = localStorage.getItem('mensajeRegistro');
+  if (mensajeRegistro) {
+    mostrarMensaje(mensajeRegistro, 'success');
+    localStorage.removeItem('mensajeRegistro');
+  }
+
   const mensajeLogout = localStorage.getItem('mensajeLogout');
   if (mensajeLogout) {
     mostrarMensaje(mensajeLogout, 'success');
@@ -221,7 +227,7 @@ async function handleRegister(e) {
     
     if (response.ok) {
       console.log('Registro exitoso, preparando para iniciar sesión automáticamente');
-      localStorage.setItem('mensajeLogin', 'Registro exitoso. Inicio de sesión automático');
+      localStorage.setItem('mensajeRegistro', 'Registro exitoso. Sesión iniciada automáticamente.');
       console.log('Iniciando sesión automáticamente');
       await autoLogin(correoInstitucional, contraseña);
     } else {
@@ -263,7 +269,7 @@ async function autoLogin(correoInstitucional, contraseña) {
     }
   } catch (error) {
     console.error('Error en el inicio de sesión automático:', error);
-    localStorage.setItem('mensajeLogin', 'Error en el inicio de sesión automático. Por favor, intenta iniciar sesión manualmente.');
+    localStorage.setItem('mensajeRegistro', 'Error en el inicio de sesión automático. Por favor, intenta iniciar sesión manualmente.');
     window.location.href = `${APP_URL}/index.html`;
   }
 }
