@@ -1,5 +1,5 @@
 const BASE_URL = 'http://localhost:3000';
-const APP_URL = '/html'; 
+const APP_URL = '/src/html'; 
 
 // Funciones de utilidad
 const $ = (selector) => document.querySelector(selector);
@@ -67,7 +67,14 @@ document.addEventListener('DOMContentLoaded', () => {
     mostrarMensaje(mensajeLogout, 'success');
     localStorage.removeItem('mensajeLogout');
   }
+  const recuperarForm = $('.recuperar-password-form');
+  if (recuperarForm) {
+    $('#enviar-codigo-btn').addEventListener('click', enviarCodigoVerificacion);
+    $('#verificar-codigo-btn').addEventListener('click', verificarCodigo);
+    $('#cambiar-password-btn').addEventListener('click', cambiarPassword);
+  }
 });
+
 
 function setupEventListeners() {
   console.log('Configurando event listeners');
@@ -345,3 +352,98 @@ async function registrarConsulta(correoUsuario, numeroPatente) {
     console.error('Error al registrar la consulta:', error);
   }
 }
+
+javascriptCopy// ... (mantén todo el código existente)
+
+// Variables globales para el proceso de recuperación de contraseña
+let codigoVerificacion = null;
+let correoRecuperacion = null;
+
+// Función para enviar el código de verificación
+async function enviarCodigoVerificacion(e) {
+  e.preventDefault();
+  correoRecuperacion = $('#recuperar-email').value;
+  
+  try {
+    const response = await fetch(`${BASE_URL}/enviar-codigo`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ correoInstitucional: correoRecuperacion })
+    });
+    
+    const data = await response.json();
+    if (response.ok) {
+      mostrarMensaje('Código enviado. Revisa tu correo.', 'success');
+      $('#codigo-verification').style.display = 'block';
+      $('#enviar-codigo-btn').style.display = 'none';
+    } else {
+      mostrarMensaje(data.message || 'Error al enviar el código', 'error');
+    }
+  } catch (error) {
+    mostrarMensaje('Error al enviar el código: ' + error.message, 'error');
+  }
+}
+
+// Función para verificar el código
+async function verificarCodigo(e) {
+  e.preventDefault();
+  const codigoIngresado = $('#codigo-verificacion').value;
+  
+  try {
+    const response = await fetch(`${BASE_URL}/verificar-codigo`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ 
+        correoInstitucional: correoRecuperacion,
+        codigo: codigoIngresado
+      })
+    });
+    
+    const data = await response.json();
+    if (response.ok) {
+      mostrarMensaje('Código verificado correctamente', 'success');
+      $('#nueva-password').style.display = 'block';
+      $('#codigo-verification').style.display = 'none';
+    } else {
+      mostrarMensaje(data.message || 'Código incorrecto', 'error');
+    }
+  } catch (error) {
+    mostrarMensaje('Error al verificar el código: ' + error.message, 'error');
+  }
+}
+
+// Función para cambiar la contraseña
+async function cambiarPassword(e) {
+  e.preventDefault();
+  const nuevaPassword = $('#new-password').value;
+  const confirmarPassword = $('#confirm-password').value;
+  
+  if (nuevaPassword !== confirmarPassword) {
+    mostrarMensaje('Las contraseñas no coinciden', 'error');
+    return;
+  }
+  
+  try {
+    const response = await fetch(`${BASE_URL}/cambiar-password`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ 
+        correoInstitucional: correoRecuperacion,
+        nuevaPassword: nuevaPassword
+      })
+    });
+    
+    const data = await response.json();
+    if (response.ok) {
+      mostrarMensaje('Contraseña cambiada exitosamente', 'success');
+      setTimeout(() => {
+        window.location.href = `${APP_URL}/login.html`;
+      }, 2000);
+    } else {
+      mostrarMensaje(data.message || 'Error al cambiar la contraseña', 'error');
+    }
+  } catch (error) {
+    mostrarMensaje('Error al cambiar la contraseña: ' + error.message, 'error');
+  }
+}
+

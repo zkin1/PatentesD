@@ -1,4 +1,4 @@
-require('dotenv').config();
+require('dotenv').config({ path: '../.env' });
 const express = require('express');
 const sqlite3 = require('sqlite3').verbose();
 const cors = require('cors');
@@ -10,7 +10,9 @@ const rateLimit = require('express-rate-limit');
 const helmet = require('helmet');
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT;
+const nodemailer = require('nodemailer');
+const crypto = require('crypto');
 
 app.use(cors());
 app.use(bodyParser.json());
@@ -24,7 +26,7 @@ const limiter = rateLimit({
 app.use(limiter);
 
 // Conexión a SQLite
-const db = new sqlite3.Database('./patentesD.db', (err) => {
+const db = new sqlite3.Database('../patentesD.db', (err) => {
   if (err) {
     console.error('Error al conectar a la base de datos:', err.message);
   } else {
@@ -252,4 +254,131 @@ process.on('SIGINT', () => {
     console.log('Conexión a la base de datos cerrada');
     process.exit(0);
   });
+});
+
+
+const codigosVerificacion = new Map();
+
+// Configuración del transporter de nodemailer
+const transporter = nodemailer.createTransport({
+  host: "smtp.gmail.com",
+  port: 587,
+  secure: false, // true para 465, false para otros puertos
+  auth: {
+    user: process.env.EMAIL_USER, // tu correo
+    pass: process.env.EMAIL_PASS  // tu contraseña o contraseña de aplicación
+  }
+});
+
+// Ruta para enviar el código de verificación
+app.post('/enviar-codigo', [
+  body('correoInstitucional').isEmail().withMessage('Correo institucional inválido')
+], async (req, res) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return res.status(400).json({ errors: errors.array() });
+  }
+
+  const { correoInstitucional } = req.body;
+  const codigo = crypto.randomInt(1000, 9999).toString();
+
+  try {
+    // Verificar si el correo existe en la base de datos
+    const usuario = await new Promise((resolve, reject) => {
+      db.get('SELECT * FROM usuarios WHERE correoInstitucional = ?', [correoInstitucional], (err, row) => {
+        if (err) reject(err);
+        else resolve(row);
+      });
+    });
+
+    if (!usuario) {
+      return res.status(404).json({ message: 'Usuario no encontrado' });
+    }
+
+    // Enviar el correo
+    await transporter.sendMail({
+      from: '"Patentes Duoc UC" <noreply@duoc.cl>',
+      to: correoInstitucional,
+      subject: "Código de verificación para cambio de contraseña",
+      text: `Tu código de verificación es: ${codigo}`,
+      html: `<b>Tu código de verificación es: ${codigo}</b>`
+    });
+
+    // Guardar el código (en producción, usar una base de datos o caché)
+    codigosVerificacion.set(correoInstitucional, {
+      codigo,
+      timestamp: Date.now()
+    });
+
+    res.json({ message: 'Código enviado' });
+  } catch (error) {
+    console.error('Error al enviar el correo:', error);
+    res.status(500).json({ message: 'Error al enviar el código' });
+  }
+});
+
+// Ruta para verificar el código
+app.post('/verificar-codigo', [
+  body('correoInstitucional').isEmail().withMessage('Correo institucional inválido'),
+  body('codigo').isLength({ min: 4, max: 4 }).withMessage('Código inválido')
+], (req, res) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return res.status(400).json({ errors: errors.array() });
+  }
+
+  const { correoInstitucional, codigo } = req.body;
+  const verificacion = codigosVerificacion.get(correoInstitucional);
+
+  if (!verificacion) {
+    return res.status(400).json({ message: 'No se ha solicitado un código para este correo' });
+  }
+
+  if (verificacion.codigo !== codigo) {
+    return res.status(400).json({ message: 'Código incorrecto' });
+  }
+
+  if (Date.now() - verificacion.timestamp > 15 * 60 * 1000) { // 15 minutos
+    codigosVerificacion.delete(correoInstitucional);
+    return res.status(400).json({ message: 'El código ha expirado' });
+  }
+
+  // Código válido
+  codigosVerificacion.delete(correoInstitucional);
+  res.json({ message: 'Código verificado correctamente' });
+});
+
+// Ruta para cambiar la contraseña
+app.post('/cambiar-password', [
+  body('correoInstitucional').isEmail().withMessage('Correo institucional inválido'),
+  body('nuevaPassword').isLength({ min: 6 }).withMessage('La contraseña debe tener al menos 6 caracteres')
+], async (req, res) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return res.status(400).json({ errors: errors.array() });
+  }
+
+  const { correoInstitucional, nuevaPassword } = req.body;
+
+  try {
+    const hashedPassword = await bcrypt.hash(nuevaPassword, 10);
+    
+    // Actualizar la contraseña en la base de datos
+    await new Promise((resolve, reject) => {
+      db.run('UPDATE usuarios SET contraseña = ? WHERE correoInstitucional = ?', [hashedPassword, correoInstitucional], function(err) {
+        if (err) reject(err);
+        else resolve(this.changes);
+      });
+    });
+
+    res.json({ message: 'Contraseña actualizada exitosamente' });
+  } catch (error) {
+    console.error('Error al cambiar la contraseña:', error);
+    res.status(500).json({ message: 'Error al cambiar la contraseña' });
+  }
+});
+
+// Iniciar el servidor
+app.listen(PORT, () => {
+  console.log(`Servidor escuchando en http://localhost:${PORT}`);
 });
