@@ -499,4 +499,3 @@ async function cambiarPassword(e) {
     mostrarMensaje('Error al cambiar la contraseña: ' + error.message, 'error');
   }
 }
-

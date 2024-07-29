@@ -28,7 +28,7 @@ const limiter = rateLimit({
 app.use(limiter);
 
 // Conexión a SQLite
-const db = new sqlite3.Database('../patentesD.db', (err) => {
+const db = new sqlite3.Database('/usr/src/app/patentesD.db', (err) => {
   if (err) {
     console.error('Error al conectar a la base de datos:', err.message);
   } else {
