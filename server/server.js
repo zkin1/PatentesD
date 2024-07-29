@@ -11,6 +11,7 @@ const helmet = require('helmet');
 
 const app = express();
 const PORT = process.env.PORT;
+const HOST = process.env.HOST || '0.0.0.0';
 const nodemailer = require('nodemailer');
 const crypto = require('crypto');
 
@@ -241,8 +242,31 @@ app.post('/login', [
 });
 
 // Iniciar el servidor
-app.listen(PORT, () => {
-  console.log(`Servidor escuchando en http://localhost:${PORT}`);
+const server = app.listen(PORT, HOST, () => {
+  console.log(`Servidor escuchando en http://${HOST}:${PORT}`);
+});
+
+server.on('error', (error) => {
+  if (error.syscall !== 'listen') {
+    throw error;
+  }
+
+  const bind = typeof PORT === 'string'
+    ? 'Pipe ' + PORT
+    : 'Port ' + PORT;
+
+  switch (error.code) {
+    case 'EACCES':
+      console.error(`${bind} requiere privilegios elevados`);
+      process.exit(1);
+      break;
+    case 'EADDRINUSE':
+      console.error(`${bind} ya está en uso`);
+      process.exit(1);
+      break;
+    default:
+      throw error;
+  }
 });
 
 // Función para cerrar la conexión de la base de datos al cerrar el servidor
