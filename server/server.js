@@ -1,4 +1,5 @@
 require('dotenv').config({ path: '../.env' });
+require('dotenv').config();
 const express = require('express');
 const sqlite3 = require('sqlite3').verbose();
 const cors = require('cors');
@@ -10,8 +11,8 @@ const rateLimit = require('express-rate-limit');
 const helmet = require('helmet');
 
 const app = express();
-const PORT = process.env.PORT;
-const HOST = process.env.HOST || '0.0.0.0';
+const PORT = process.env.PORT ;
+const HOST = process.env.HOST ;
 const nodemailer = require('nodemailer');
 const crypto = require('crypto');
 
@@ -400,9 +401,4 @@ app.post('/cambiar-password', [
     console.error('Error al cambiar la contraseña:', error);
     res.status(500).json({ message: 'Error al cambiar la contraseña' });
   }
-});
-
-// Iniciar el servidor
-app.listen(PORT, () => {
-  console.log(`Servidor escuchando en http://localhost:${PORT}`);
 });
