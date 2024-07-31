@@ -9,16 +9,36 @@ const jwt = require('jsonwebtoken');
 const { body, param, validationResult } = require('express-validator');
 const rateLimit = require('express-rate-limit');
 const helmet = require('helmet');
-
-const app = express();
-const PORT = process.env.PORT ;
-const HOST = process.env.HOST ;
+const path = require('path');
 const nodemailer = require('nodemailer');
 const crypto = require('crypto');
+const https = require('https');
+const http = require('http');
+const fs = require('fs');
+const WebSocket = require('ws');
 
-app.use(cors());
+const app = express();
+const PORT = process.env.PORT;
+const HOST = process.env.HOST;
+
+const server_http = http.createServer(app);
+
+const wss = new WebSocket.Server({ server: server_http });
+
+wss.on('connection', function connection(ws) {
+  console.log('Nueva conexión WebSocket establecida');
+});
+
+app.use(cors({
+  origin: ['https://34.171.190.239', 'http://34.171.190.239'],
+  optionsSuccessStatus: 200
+}));
 app.use(bodyParser.json());
-app.use(helmet());
+
+const https = require('https');
+const http = require('http');
+const fs = require('fs');
+
 
 // Rate limiting
 const limiter = rateLimit({
@@ -125,17 +145,24 @@ app.post('/usuarios', [
 
     const hashedPassword = await bcrypt.hash(contraseña, 10);
 
-    await new Promise((resolve, reject) => {
+    const newUserId = await new Promise((resolve, reject) => {
       db.run('INSERT INTO usuarios (nombre, contraseña, numeroPatente, numeroTelefono, correoInstitucional) VALUES (?, ?, ?, ?, ?)',
         [nombre, hashedPassword, numeroPatente, numeroTelefono, correoInstitucional],
         function(err) {
           if (err) reject(err);
-          else resolve(this.lastID);
+          else {
+            // Emitir actualización
+            broadcastDatabaseUpdate({
+              type: 'newUser',
+              user: { id: this.lastID, nombre, correoInstitucional, numeroPatente, numeroTelefono }
+            });
+            resolve(this.lastID);
+          }
         }
       );
     });
 
-    res.status(201).json({ message: 'Usuario registrado exitosamente' });
+    res.status(201).json({ message: 'Usuario registrado exitosamente', userId: newUserId });
   } catch (error) {
     console.error('Error al registrar usuario:', error);
     res.status(500).json({ error: 'Error interno del servidor al registrar el usuario' });
@@ -160,6 +187,13 @@ app.post('/consultasRegistradas', authenticateToken, [
         res.status(500).json({ error: err.message });
         return;
       }
+      
+      // Emitir actualización
+      broadcastDatabaseUpdate({
+        type: 'newConsulta',
+        consulta: { id: this.lastID, correoUsuario, numeroPatente }
+      });
+
       res.status(201).json({ id: this.lastID, correoUsuario, numeroPatente });
     }
   );
@@ -227,6 +261,13 @@ app.post('/login', [
     if (row && await bcrypt.compare(contraseña, row.contraseña)) {
       console.log('Autenticación exitosa');
       const token = jwt.sign({ id: row.id, correoInstitucional: row.correoInstitucional }, process.env.JWT_SECRET, { expiresIn: '1h' });
+      
+      // Emitir actualización
+      broadcastDatabaseUpdate({
+        type: 'login',
+        user: { id: row.id, nombre: row.nombre, correoInstitucional: row.correoInstitucional }
+      });
+
       res.json({
         valido: true,
         token,
@@ -242,8 +283,9 @@ app.post('/login', [
   });
 });
 
+
 // Iniciar el servidor
-const server = app.listen(PORT, HOST, () => {
+const server = app.listen(PORT, HOST, () => {  
   console.log(`Servidor escuchando en http://${HOST}:${PORT}`);
 });
 
@@ -402,3 +444,113 @@ app.post('/cambiar-password', [
     res.status(500).json({ message: 'Error al cambiar la contraseña' });
   }
 });
+
+app.get('/admin-data', authenticateToken, async (req, res) => {
+  try {
+    const usuarios = await new Promise((resolve, reject) => {
+      db.all('SELECT id, nombre, correoInstitucional, numeroPatente, numeroTelefono FROM usuarios', [], (err, rows) => {
+        if (err) reject(err);
+        else resolve(rows);
+      });
+    });
+
+    const consultas = await new Promise((resolve, reject) => {
+      db.all('SELECT * FROM consultasRegistradas', [], (err, rows) => {
+        if (err) reject(err);
+        else resolve(rows);
+      });
+    });
+
+    res.json({ usuarios, consultas });
+  } catch (error) {
+    console.error('Error al obtener datos de administración:', error);
+    res.status(500).json({ error: 'Error al obtener datos de administración' });
+  }
+});
+
+// Servir archivos estáticos
+app.use(express.static(path.join(__dirname, '..', 'src')));
+
+// Ruta para manejar las páginas HTML específicas
+app.get('/*.html', (req, res) => {
+  res.sendFile(path.join(__dirname, '..', 'src', 'html', req.path));
+});
+
+// Ruta para la página principal
+app.get('/', (req, res) => {
+  res.sendFile(path.join(__dirname, '../src/html/index.html'));
+});
+
+// Ruta para manejar todas las demás solicitudes
+app.get('*', (req, res) => {
+  res.sendFile(path.join(__dirname, '../src/html/index.html'));
+});
+
+app.get('/admin', authenticateToken, (req, res) => {
+  res.sendFile(path.join(__dirname, '../src/html/admin.html'));
+});
+
+
+app.use((req, res, next) => {
+  if (req.headers['x-forwarded-proto'] !== 'https') {
+    return res.redirect(`https://${req.headers.host}${req.url}`);
+  }
+  next();
+});
+
+//servidor HTTP
+
+const httpsServer = https.createServer({
+  key: fs.readFileSync('/usr/src/app/ssl/server.key'),
+  cert: fs.readFileSync('/usr/src/app/ssl/server.crt')
+}, app);
+
+https.createServer(options, app).listen(443, () => {
+});
+
+http.createServer(app).listen(80, () => {
+});
+
+server.listen(80, () => {
+  console.log('HTTP Server running on port 80');
+});
+
+httpsServer.listen(443, () => {
+  console.log('HTTPS Server running on port 443');
+});
+
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      ...helmet.contentSecurityPolicy.getDefaultDirectives(),
+      "default-src": ["'self'", "https:", "http:"],
+      "script-src": ["'self'", "'unsafe-inline'", "https:", "http:"],
+      "style-src": ["'self'", "'unsafe-inline'", "https:", "http:"],
+      "img-src": ["'self'", "data:", "https:", "http:"],
+      "font-src": ["'self'", "https:", "http:"],
+    },
+  },
+  crossOriginEmbedderPolicy: false,
+  crossOriginOpenerPolicy: { policy: "same-origin-allow-popups" },
+}));
+
+app.use((req, res, next) => {
+  if (!req.secure) {
+    return res.redirect('https://' + req.headers.host + req.url);
+  }
+  next();
+})
+
+
+//conexion con la DB en tiempo real 
+
+// Inicializar el WebSocket Server
+
+
+function broadcastDatabaseUpdate(data) {
+  wss.clients.forEach(function each(client) {
+    if (client.readyState === WebSocket.OPEN) {
+      client.send(JSON.stringify(data));
+    }
+  });
+}

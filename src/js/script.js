@@ -1,5 +1,5 @@
-const BASE_URL = 'http://localhost:3456';
-const APP_URL = '/src/html'; 
+const BASE_URL = window.location.origin;
+const APP_URL = ''; 
 
 // Funciones de utilidad
 const $ = (selector) => document.querySelector(selector);
@@ -72,6 +72,9 @@ document.addEventListener('DOMContentLoaded', () => {
     $('#enviar-codigo-btn').addEventListener('click', enviarCodigoVerificacion);
     $('#verificar-codigo-btn').addEventListener('click', verificarCodigo);
     $('#cambiar-password-btn').addEventListener('click', cambiarPassword);
+  }
+  if (window.location.pathname.includes('admin')) {
+    initWebSocket();
   }
 });
 
@@ -497,5 +500,82 @@ async function cambiarPassword(e) {
     }
   } catch (error) {
     mostrarMensaje('Error al cambiar la contraseña: ' + error.message, 'error');
+  }
+}
+
+//USO DE WEB SOCKET
+
+function initWebSocket() {
+  const ws = new WebSocket('wss://' + window.location.host);
+  
+  ws.onopen = function() {
+    console.log('Conexión WebSocket establecida');
+    fetchInitialData();
+  };
+  
+  ws.onmessage = function(event) {
+    const data = JSON.parse(event.data);
+    handleUpdate(data);
+  };
+
+  function fetchInitialData() {
+    fetch('/admin-data')
+      .then(response => response.json())
+      .then(data => {
+        updateUserList(data.usuarios);
+        updateConsultaList(data.consultas);
+      })
+      .catch(error => console.error('Error fetching initial data:', error));
+  }
+
+  function updateUserList(users) {
+    const userList = document.getElementById('userList');
+    if (userList) {
+      userList.innerHTML = users.map(user => `<li>${user.nombre} (${user.correoInstitucional})</li>`).join('');
+    }
+  }
+
+  function updateConsultaList(consultas) {
+    const consultaList = document.getElementById('consultaList');
+    if (consultaList) {
+      consultaList.innerHTML = consultas.map(consulta => `<li>${consulta.correoUsuario} buscó ${consulta.numeroPatente}</li>`).join('');
+    }
+  }
+
+  function handleUpdate(data) {
+    switch(data.type) {
+      case 'newUser':
+        addUser(data.user);
+        break;
+      case 'login':
+        updateUserStatus(data.user);
+        break;
+      case 'newConsulta':
+        addConsulta(data.consulta);
+        break;
+    }
+  }
+
+  function addUser(user) {
+    const userList = document.getElementById('userList');
+    if (userList) {
+      const listItem = document.createElement('li');
+      listItem.textContent = `${user.nombre} (${user.correoInstitucional})`;
+      userList.appendChild(listItem);
+    }
+  }
+
+  function updateUserStatus(user) {
+    console.log(`Usuario conectado: ${user.nombre}`);
+    // Puedes implementar una lógica para mostrar usuarios conectados si lo deseas
+  }
+
+  function addConsulta(consulta) {
+    const consultaList = document.getElementById('consultaList');
+    if (consultaList) {
+      const listItem = document.createElement('li');
+      listItem.textContent = `${consulta.correoUsuario} buscó ${consulta.numeroPatente}`;
+      consultaList.appendChild(listItem);
+    }
   }
 }
