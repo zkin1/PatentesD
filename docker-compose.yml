@@ -1,0 +1,78 @@
+version: '3.8'
+
+services:
+  patentesd:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: zkin/patentesd:latest
+    container_name: patentesd
+    ports:
+      - "49160:49160"
+      - "80:80"
+      - "443:443"
+    environment:
+      - NODE_ENV=production
+      - DB_PATH=/usr/src/app/data/patentesD.db
+    volumes:
+      - ./data:/usr/src/app/data
+      - ./ssl:/usr/src/app/ssl
+    deploy:
+      resources:
+        limits:
+          cpus: '0.75'
+          memory: 512M
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:49160/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "200k"
+        max-file: "10"
+    restart: unless-stopped
+    depends_on:
+      - adminer
+
+  adminer:
+    image: adminer
+    container_name: patentes-duoc-adminer
+    restart: always
+    ports:
+      - "8080:8080"
+    environment:
+      ADMINER_DEFAULT_SERVER: sqlite
+      ADMINER_DESIGN: pepa-linha
+
+  backup:
+    image: alpine
+    container_name: patentesdbackup
+    volumes:
+      - ./data:/data
+      - ./backups:/backups
+    command: >
+      sh -c '
+      while true; do 
+        cp /data/patentesD.db /backups/patentesD_$$(date +%Y%m%d_%H%M%S).db; 
+        find /backups -name "patentesD_*.db" -type f -mtime +7 -delete;
+        sleep 86400; 
+      done
+      '
+
+networks:
+  default:
+    name: patentes-network
+    driver: bridge
+
+volumes:
+  data:
+  ssl:
+  backups:
+
+secrets:
+  jwt_secret:
+    file: ./secrets/jwt_secret.txt
+  db_password:
+    file: ./secrets/db_password.txt

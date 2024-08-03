@@ -1,32 +1,49 @@
-FROM node:18-alpine
+# Etapa de construcción
+FROM node:18 AS builder
 
+# Crear directorio de la aplicación
 WORKDIR /usr/src/app
 
-# Instalar dependencias necesarias para la compilación
-RUN apk add --no-cache python3 make g++ sqlite-dev py3-setuptools
+# Instalar dependencias del sistema necesarias para bcrypt
+RUN apt-get update && apt-get install -y python3 make g++ 
 
-# Copiar archivos de configuración de npm
+# Copiar package.json y package-lock.json
 COPY package*.json ./
 
 # Instalar dependencias
-RUN npm install --build-from-source --sqlite=/usr/src/app/node_modules/sqlite3
+RUN npm ci
 
-# Copiar la base de datos
-COPY patentesD.db ./
+# Copiar el resto del código fuente
+COPY . .
+COPY .env .env
+# Compilar bcrypt específicamente para esta plataforma
+RUN npm rebuild bcrypt --build-from-source
 
-# Copiar el código fuente
-COPY server /usr/src/app/server
-COPY src /usr/src/app/src
+# Etapa de producción
+FROM node:18-slim
 
-# Copiar el archivo .env si lo estás usando
-COPY .env ./
+WORKDIR /usr/src/app
+
+# Copiar los archivos construidos desde la etapa de builder
+COPY --from=builder /usr/src/app .
+
+# Instalar solo las dependencias de producción
+RUN npm ci --only=production
+
+# Copiar SSL y base de datos
+COPY ssl ./ssl
+COPY ./data/patentesD.db ./data/patentesD.db
 
 # Establecer variables de entorno
+ENV NODE_ENV=production
 ENV PORT=49160
 ENV HOST=0.0.0.0
 
-# Exponer el puerto en el que tu aplicación escucha
-EXPOSE 49160
-EXPOSE 80 443
+# Exponer puertos
+EXPOSE 49160 80 443
+
+# Cambiar al usuario node por seguridad
+USER node
+
 # Comando para ejecutar la aplicación
 CMD ["node", "server/server.js"]
