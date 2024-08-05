@@ -3,10 +3,7 @@ const { body } = require('express-validator');
 const authController = require('../controllers/authController');
 const router = express.Router();
 
-router.post('/login', [
-  body('correoInstitucional').isEmail(),
-  body('contraseña').isLength({ min: 6 })
-], authController.login);
+router.post('/login', authController.login);
 
 router.post('/register', [
   body('nombre').isString().trim().notEmpty(),

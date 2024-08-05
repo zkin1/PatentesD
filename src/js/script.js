@@ -184,7 +184,7 @@ async function handleLogin(e) {
   const correoInstitucional = $('#login-email').value;
   const contraseña = $('#login-password').value;
   try {
-    const response = await fetch(`${BASE_URL}/login`, {
+    const response = await fetch(`${BASE_URL}/api/auth/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ correoInstitucional, contraseña })
@@ -226,7 +226,7 @@ async function handleRegister(e) {
 
   try {
     console.log('Enviando solicitud al servidor');
-    const response = await fetch(`${BASE_URL}/usuarios`, {
+    const response = await fetch(`${BASE_URL}/api/usuarios`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ nombre, correoInstitucional, contraseña, numeroPatente, numeroTelefono })
@@ -305,7 +305,7 @@ async function buscarPorPatente(numeroPatente) {
       'Content-Type': 'application/json',
       'Authorization': `Bearer ${AppState.usuario.token}`
     };
-    const response = await fetch(`${BASE_URL}/buscarPorPatente/${numeroPatente}`, {
+    const response = await fetch(`${BASE_URL}/api/search/patente/${numeroPatente}`, {
       headers: headers
     });
     let resultadoHTML;
@@ -330,7 +330,9 @@ async function buscarPorPatente(numeroPatente) {
     searchResults.style.display = 'block';
     AppState.setUltimaBusqueda({ html: resultadoHTML, patente: numeroPatente });
   } catch (error) {
+    console.error('Error en la búsqueda:', error);
     searchResults.innerHTML = `<p>Error: ${error.message}</p>`;
+    searchResults.style.display = 'block';
     AppState.setUltimaBusqueda({ html: searchResults.innerHTML, patente: numeroPatente });
   }
   console.log('Búsqueda completada, resultados mostrados');
@@ -342,20 +344,29 @@ async function registrarConsulta(correoUsuario, numeroPatente) {
       'Content-Type': 'application/json',
       'Authorization': `Bearer ${AppState.usuario.token}`
     };
-    const response = await fetch(`${BASE_URL}/consultasRegistradas`, {
+    const response = await fetch(`${BASE_URL}/api/search/consultasRegistradas`, {
       method: 'POST',
       headers: headers,
       body: JSON.stringify({ correoUsuario, numeroPatente })
     });
+    
     if (!response.ok) {
-      throw new Error('Error al registrar la consulta');
+      const contentType = response.headers.get("content-type");
+      if (contentType && contentType.indexOf("application/json") !== -1) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Error al registrar la consulta');
+      } else {
+        const text = await response.text();
+        throw new Error(`Error inesperado: ${text}`);
+      }
     }
+    
     console.log('Consulta registrada exitosamente');
   } catch (error) {
     console.error('Error al registrar la consulta:', error);
+    mostrarMensaje('Error al registrar la consulta: ' + error.message, 'error');
   }
 }
-
 // Variables globales para el proceso de recuperación de contraseña
 let codigoVerificacion = null;
 let correoRecuperacion = null;
@@ -368,7 +379,7 @@ async function enviarCodigoVerificacion(e) {
   console.log('Intentando enviar código a:', correoRecuperacion);
   
   try {
-    const response = await fetch(`${BASE_URL}/enviar-codigo`, {
+    const response = await fetch(`${BASE_URL}/api/enviar-codigo`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ correoInstitucional: correoRecuperacion })
@@ -400,7 +411,7 @@ async function verificarCodigo(e) {
   console.log('Verificando código:', codigoIngresado);
 
   try {
-    const response = await fetch(`${BASE_URL}/verificar-codigo`, {
+    const response = await fetch(`${BASE_URL}/api/verificar-codigo`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ 
@@ -440,7 +451,7 @@ async function cambiarPassword(e) {
   console.log('Intentando cambiar contraseña para:', correoRecuperacion);
 
   try {
-    const response = await fetch(`${BASE_URL}/cambiar-password`, {
+    const response = await fetch(`${BASE_URL}/api/cambiar-password`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ 
@@ -480,7 +491,7 @@ async function cambiarPassword(e) {
   }
   
   try {
-    const response = await fetch(`${BASE_URL}/cambiar-password`, {
+    const response = await fetch(`${BASE_URL}/api/cambiar-password`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ 

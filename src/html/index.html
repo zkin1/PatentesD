@@ -34,7 +34,7 @@
           <span class="nav-link">Bienvenido, <span id="username-display"></span></span>
         </li>
         <li class="nav-item" id="logout-link" style="display: none;">
-          <a class="nav-link" href="#" onclick="logout()"><i class='bx bx-log-out'></i> Cerrar sesión</a>
+          <a class="nav-link" href="#" onclick="AppState.logout()"><i class='bx bx-log-out'></i> Cerrar sesión</a>
         </li>
       </ul>
     </div>
@@ -75,7 +75,11 @@
     </div>
   </footer>
 
+  <script>
+    window.CONFIG = {
+      API_URL: '{{API_URL}}'
+    };
+  </script>
   <script src="/js/script.js"></script>
-  
 </body>
 </html>

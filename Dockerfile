@@ -4,18 +4,16 @@ FROM node:18 AS builder
 # Crear directorio de la aplicación
 WORKDIR /usr/src/app
 
-# Instalar dependencias del sistema necesarias para bcrypt
-RUN apt-get update && apt-get install -y python3 make g++ 
-
-# Copiar package.json y package-lock.json
-COPY package*.json ./
-
-# Instalar dependencias
-RUN npm ci
-
 # Copiar el resto del código fuente
 COPY . .
 COPY .env .env
+# Copiar package.json y package-lock.json
+COPY package*.json ./
+
+# Instalar dependencias del sistema necesarias para bcrypt
+RUN apt-get update && apt-get install -y python3 make g++ 
+# Instalar dependencias
+RUN npm ci
 # Compilar bcrypt específicamente para esta plataforma
 RUN npm rebuild bcrypt --build-from-source
 

@@ -70,9 +70,3 @@ volumes:
   data:
   ssl:
   backups:
-
-secrets:
-  jwt_secret:
-    file: ./secrets/jwt_secret.txt
-  db_password:
-    file: ./secrets/db_password.txt
